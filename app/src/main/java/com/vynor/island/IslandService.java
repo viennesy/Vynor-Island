@@ -31,6 +31,8 @@ import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.View;
 import android.view.WindowManager;
+import android.view.animation.DecelerateInterpolator;
+import android.view.animation.OvershootInterpolator;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -52,6 +54,9 @@ public class IslandService extends Service {
     boolean expanded, receiverOn, force;
     int curW, idleW = 110, expW = 260, hgt = 34, posY = 6;
     MediaController mc;
+    int radius = 22, opacity = 100, textSp = 14, colorIdx = 0, speed = 250, bounce = 4;
+    boolean liquid = true, lastShow;
+    final TextView[] ctrl = new TextView[3];
 
     int dp(int v) { return (int) (v * getResources().getDisplayMetrics().density); }
 
@@ -121,6 +126,7 @@ public class IslandService extends Service {
             b.setTextColor(Color.WHITE);
             b.setPadding(dp(18), dp(4), dp(18), dp(4));
             b.setOnClickListener(v -> media(key));
+            ctrl[k] = b;
             controls.addView(b);
         }
         root.addView(tTitle);
@@ -154,9 +160,27 @@ public class IslandService extends Service {
         expW = sp.getInt("expW", 260);
         hgt = sp.getInt("height", 34);
         posY = sp.getInt("posY", 6);
+        radius = sp.getInt("radius", 22);
+        opacity = sp.getInt("opacity", 100);
+        textSp = sp.getInt("textSize", 14);
+        colorIdx = Math.min(sp.getInt("islandColor", 0), Look.ISLAND.length - 1);
+        speed = sp.getInt("speed", 250);
+        bounce = sp.getInt("bounce", 4);
+        liquid = sp.getBoolean("liquid", true);
         if (root == null) return;
+        int base = Look.ISLAND[colorIdx];
+        bg.setColor((base & 0x00FFFFFF) | ((opacity * 255 / 100) << 24));
+        bg.setCornerRadius(dp(radius));
+        bg.setStroke(liquid ? dp(1) : 0, 0x40FFFFFF);
+        boolean light = colorIdx == 4;
+        int main = light ? 0xFF111111 : Color.WHITE;
+        int sub = light ? 0xFF555555 : Color.LTGRAY;
+        tTitle.setTextColor(main);
+        tTitle.setTextSize(textSp);
+        tSub.setTextColor(sub);
+        tSub.setTextSize(textSp - 2);
+        for (TextView c : ctrl) { c.setTextColor(main); c.setTextSize(textSp + 10); }
         root.setMinimumHeight(dp(hgt));
-        bg.setCornerRadius(Math.min(dp(22), dp(hgt) / 2f));
         lp.y = dp(posY);
         force = true;
         render();
@@ -221,6 +245,13 @@ public class IslandService extends Service {
         tSub.setVisibility(show && s != null && !s.isEmpty() ? View.VISIBLE : View.GONE);
         controls.setVisibility(ctrl ? View.VISIBLE : View.GONE);
         if (show) { tTitle.setText(t); tSub.setText(s); }
+        if (show != lastShow) {
+            lastShow = show;
+            if (show && liquid) {
+                tTitle.setAlpha(0f); tTitle.animate().alpha(1f).setDuration(speed);
+                tSub.setAlpha(0f); tSub.animate().alpha(1f).setDuration(speed);
+            }
+        }
         animateTo(dp(show ? (ctrl ? expW + 40 : expW) : idleW));
     }
 
@@ -234,7 +265,8 @@ public class IslandService extends Service {
         }
         if (w == curW) return;
         ValueAnimator a = ValueAnimator.ofInt(curW, w);
-        a.setDuration(250);
+        a.setDuration(speed);
+        a.setInterpolator(liquid ? new OvershootInterpolator(bounce * 0.4f) : new DecelerateInterpolator());
         a.addUpdateListener(v -> {
             lp.width = (int) v.getAnimatedValue();
             try { wm.updateViewLayout(root, lp); } catch (Exception ignored) { }

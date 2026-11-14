@@ -32,7 +32,8 @@ public class NotifService extends NotificationListenerService {
         if (t == null && x == null) return;
 
         IslandService s = IslandService.instance;
-        if (s != null) s.flash(t == null ? "" : t.toString(), x == null ? "" : x.toString(), 4000);
+        if (s != null) s.flash(t == null ? "" : t.toString(), x == null ? "" : x.toString(),
+                getSharedPreferences("island", MODE_PRIVATE).getInt("notifSec", 4) * 1000L);
 
         if (getSharedPreferences("island", MODE_PRIVATE).getBoolean("block", false)) {
             Blocked b = new Blocked();
