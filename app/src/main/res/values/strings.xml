@@ -27,4 +27,26 @@
     <string name="charging">Charging</string>
     <string name="unplugged">Charger unplugged</string>
     <string name="media">Media</string>
+    <string name="sub_setup">Grant two permissions, then start the island.</string>
+    <string name="sub_timer">Countdown or stopwatch, shown live in the island.</string>
+    <string name="sub_size">Changes apply instantly while the island is running.</string>
+    <string name="sub_notif">Show notifications only in the island, and bring them back anytime.</string>
+    <string name="page_setup">Setup</string>
+    <string name="appearance">Appearance</string>
+    <string name="sub_appearance">Pick a theme and decide how glassy everything feels.</string>
+    <string name="theme">Theme</string>
+    <string name="liquid">Liquid glass and motion</string>
+    <string name="island_section">Island</string>
+    <string name="sub_island">Everything about the island, applied live.</string>
+    <string name="size_pos">Size and position</string>
+    <string name="look">Look</string>
+    <string name="motion">Motion</string>
+    <string name="corner">Corner radius (dp)</string>
+    <string name="opacity">Opacity (%)</string>
+    <string name="text_size">Text size (sp)</string>
+    <string name="island_color">Island color</string>
+    <string name="anim_ms">Animation duration (ms)</string>
+    <string name="bounce">Bounce</string>
+    <string name="notif_sec">Notification time (s)</string>
+    <string name="reset">Reset island settings</string>
 </resources>
