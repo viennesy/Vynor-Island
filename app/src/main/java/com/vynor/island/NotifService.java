@@ -31,6 +31,7 @@ public class NotifService extends NotificationListenerService {
         CharSequence x = e.getCharSequence(Notification.EXTRA_TEXT);
         if (t == null && x == null) return;
 
+        if (!getSharedPreferences("island", MODE_PRIVATE).getBoolean("pl_notif", true)) return;
         IslandService s = IslandService.instance;
         if (s != null) s.flash(t == null ? "" : t.toString(), x == null ? "" : x.toString(),
                 getSharedPreferences("island", MODE_PRIVATE).getInt("notifSec", 4) * 1000L);

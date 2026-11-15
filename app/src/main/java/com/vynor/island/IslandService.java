@@ -55,7 +55,9 @@ public class IslandService extends Service {
     int curW, idleW = 110, expW = 260, hgt = 34, posY = 6;
     MediaController mc;
     int radius = 22, opacity = 100, textSp = 14, colorIdx = 0, speed = 250, bounce = 4;
-    boolean liquid = true, lastShow;
+    boolean liquidMotion = true, glass = true, notch, hideLand, hideIdle, lastShow;
+    int posX;
+    String tmpKind = "notif";
     final TextView[] ctrl = new TextView[3];
 
     int dp(int v) { return (int) (v * getResources().getDisplayMetrics().density); }
@@ -157,21 +159,26 @@ public class IslandService extends Service {
     /** Reads size settings and applies them to the live island. */
     void applyPrefs() {
         idleW = sp.getInt("idleW", 110);
-        expW = sp.getInt("expW", 260);
         hgt = sp.getInt("height", 34);
         posY = sp.getInt("posY", 6);
+        posX = sp.getInt("posX", 0);
         radius = sp.getInt("radius", 22);
         opacity = sp.getInt("opacity", 100);
         textSp = sp.getInt("textSize", 14);
         colorIdx = Math.min(sp.getInt("islandColor", 0), Look.ISLAND.length - 1);
         speed = sp.getInt("speed", 250);
         bounce = sp.getInt("bounce", 4);
-        liquid = sp.getBoolean("liquid", true);
+        liquidMotion = sp.getBoolean("liquidMotion", true);
+        glass = sp.getBoolean("glass", true);
+        notch = sp.getBoolean("notch", false);
+        hideLand = sp.getBoolean("hideLand", false);
+        hideIdle = sp.getBoolean("hideIdle", false);
         if (root == null) return;
         int base = Look.ISLAND[colorIdx];
         bg.setColor((base & 0x00FFFFFF) | ((opacity * 255 / 100) << 24));
-        bg.setCornerRadius(dp(radius));
-        bg.setStroke(liquid ? dp(1) : 0, 0x40FFFFFF);
+        float r = dp(radius);
+        if (notch) bg.setCornerRadii(new float[]{0, 0, 0, 0, r, r, r, r}); else bg.setCornerRadius(r);
+        bg.setStroke(glass ? dp(1) : 0, 0x40FFFFFF);
         boolean light = colorIdx == 4;
         int main = light ? 0xFF111111 : Color.WHITE;
         int sub = light ? 0xFF555555 : Color.LTGRAY;
@@ -181,7 +188,8 @@ public class IslandService extends Service {
         tSub.setTextSize(textSp - 2);
         for (TextView c : ctrl) { c.setTextColor(main); c.setTextSize(textSp + 10); }
         root.setMinimumHeight(dp(hgt));
-        lp.y = dp(posY);
+        lp.y = notch ? 0 : dp(posY);
+        lp.x = dp(posX);
         force = true;
         render();
     }
@@ -210,25 +218,31 @@ public class IslandService extends Service {
         } catch (SecurityException ignored) { }
     }
 
+    int evW(String kind) { return sp.getInt("w_" + kind, 260); }
+
+    boolean on(String plugin) { return sp.getBoolean("pl_" + plugin, true); }
+
     void render() {
         if (root == null) return;
         long now = System.currentTimeMillis();
-        String t = null, s = null;
+        String t = null, s = null, kind = "notif";
         boolean ctrl = false;
         findMedia();
         if (mc == null) expanded = false;
 
-        if (now < tmpUntil) { t = tmpTitle; s = tmpSub; }
+        if (now < tmpUntil) { t = tmpTitle; s = tmpSub; kind = tmpKind; }
         else if (timerEnd > 0) {
+            kind = "timer";
             long left = timerEnd - now;
             if (left <= 0) {
                 timerEnd = 0;
                 vibrate();
-                tmpTitle = "⏰ " + getString(R.string.timer_done); tmpSub = ""; tmpUntil = now + 6000;
+                tmpTitle = "⏰ " + getString(R.string.timer_done); tmpSub = ""; tmpKind = "timer"; tmpUntil = now + 6000;
                 t = tmpTitle; s = "";
             } else { t = "⏳ " + getString(R.string.timer); s = fmt(left); }
-        } else if (stopStart > 0) { t = "⏱ " + getString(R.string.stopwatch); s = fmt(now - stopStart); }
-        else if (mc != null) {
+        } else if (stopStart > 0) { kind = "stopwatch"; t = "⏱ " + getString(R.string.stopwatch); s = fmt(now - stopStart); }
+        else if (mc != null && on("media")) {
+            kind = "media";
             MediaMetadata md = mc.getMetadata();
             PlaybackState ps = mc.getPlaybackState();
             boolean play = ps != null && ps.getState() == PlaybackState.STATE_PLAYING;
@@ -241,18 +255,20 @@ public class IslandService extends Service {
         }
 
         boolean show = t != null;
+        boolean land = getResources().getConfiguration().orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE;
+        root.setVisibility((hideLand && land) || (hideIdle && !show) ? View.GONE : View.VISIBLE);
         tTitle.setVisibility(show ? View.VISIBLE : View.GONE);
         tSub.setVisibility(show && s != null && !s.isEmpty() ? View.VISIBLE : View.GONE);
         controls.setVisibility(ctrl ? View.VISIBLE : View.GONE);
         if (show) { tTitle.setText(t); tSub.setText(s); }
         if (show != lastShow) {
             lastShow = show;
-            if (show && liquid) {
+            if (show && liquidMotion) {
                 tTitle.setAlpha(0f); tTitle.animate().alpha(1f).setDuration(speed);
                 tSub.setAlpha(0f); tSub.animate().alpha(1f).setDuration(speed);
             }
         }
-        animateTo(dp(show ? (ctrl ? expW + 40 : expW) : idleW));
+        animateTo(dp(show ? (ctrl ? evW(kind) + 40 : evW(kind)) : idleW));
     }
 
     void animateTo(int w) {
@@ -266,7 +282,7 @@ public class IslandService extends Service {
         if (w == curW) return;
         ValueAnimator a = ValueAnimator.ofInt(curW, w);
         a.setDuration(speed);
-        a.setInterpolator(liquid ? new OvershootInterpolator(bounce * 0.4f) : new DecelerateInterpolator());
+        a.setInterpolator(liquidMotion ? new OvershootInterpolator(bounce * 0.4f) : new DecelerateInterpolator());
         a.addUpdateListener(v -> {
             lp.width = (int) v.getAnimatedValue();
             try { wm.updateViewLayout(root, lp); } catch (Exception ignored) { }
@@ -286,9 +302,11 @@ public class IslandService extends Service {
         if (v != null) v.vibrate(VibrationEffect.createOneShot(800, VibrationEffect.DEFAULT_AMPLITUDE));
     }
 
-    void flash(String t, String s, long ms) {
+    void flash(String t, String s, long ms) { flashK("notif", t, s, ms); }
+
+    void flashK(String kind, String t, String s, long ms) {
         h.post(() -> {
-            tmpTitle = t; tmpSub = s;
+            tmpKind = kind; tmpTitle = t; tmpSub = s;
             tmpUntil = System.currentTimeMillis() + ms;
             render();
         });
@@ -304,9 +322,10 @@ public class IslandService extends Service {
 
     final BroadcastReceiver rcv = new BroadcastReceiver() {
         @Override public void onReceive(Context c, Intent i) {
+            if (!on("charge")) return;
             if (Intent.ACTION_POWER_CONNECTED.equals(i.getAction()))
-                flash("⚡ " + getString(R.string.charging), battery() + "%", 3500);
-            else flash("🔋 " + getString(R.string.unplugged), battery() + "%", 2500);
+                flashK("charge", "⚡ " + getString(R.string.charging), battery() + "%", 3500);
+            else flashK("charge", "🔋 " + getString(R.string.unplugged), battery() + "%", 2500);
         }
     };
 
@@ -318,8 +337,8 @@ public class IslandService extends Service {
         if (i != null && i.getAction() != null) {
             long now = System.currentTimeMillis();
             switch (i.getAction()) {
-                case "TIMER": timerEnd = now + i.getIntExtra("min", 1) * 60000L; stopStart = 0; break;
-                case "STOPWATCH": stopStart = now; timerEnd = 0; break;
+                case "TIMER": if (on("timer")) { timerEnd = now + i.getIntExtra("min", 1) * 60000L; stopStart = 0; } break;
+                case "STOPWATCH": if (on("stopwatch")) { stopStart = now; timerEnd = 0; } break;
                 case "STOP": timerEnd = 0; stopStart = 0; break;
             }
         }
